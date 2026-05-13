@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Replace these with actual launcher icons.
+  You can generate them at https://appicon.co/ or with flutter_launcher_icons package.
+  Required sizes:
+    mipmap-mdpi:    48x48
+    mipmap-hdpi:    72x72
+    mipmap-xhdpi:   96x96
+    mipmap-xxhdpi: 144x144
+    mipmap-xxxhdpi: 192x192
+-->
+<resources/>
