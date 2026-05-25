@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "987332213235",
+    "project_id": "ailogicfirebase",
+    "storage_bucket": "ailogicfirebase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:987332213235:android:cb5dbfefdab534ac563a86",
+        "android_client_info": {
+          "package_name": "com.example.ai_logic_firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzk2dFOE8B9J2qXjzpCEc-9X-ifRnPtQw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

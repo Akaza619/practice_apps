@@ -1,15 +1,12 @@
 import 'dart:io';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:firebase_ai/firebase_ai.dart';
 import '../utils/json_parser.dart';
 
 class FirebaseAiService {
   final GenerativeModel _model;
 
   FirebaseAiService(String apiKey)
-      : _model = GenerativeModel(
-          model: 'gemini-flash-latest', // Fallback to latest flash model to fix free tier limit 0 issue
-          apiKey: apiKey,
-        );
+    : _model = GenerativeModel(model: 'gemini-flash-latest', apiKey: apiKey);
 
   Future<Map<String, dynamic>?> analyzeReceipt(File imageFile) async {
     try {
@@ -44,11 +41,14 @@ Rules:
 ''');
 
       final imageParts = [
-        DataPart('image/jpeg', imageBytes), // Adjust mime type if necessary based on actual image
+        DataPart(
+          'image/jpeg',
+          imageBytes,
+        ), // Adjust mime type if necessary based on actual image
       ];
 
       final response = await _model.generateContent([
-        Content.multi([prompt, ...imageParts])
+        Content.multi([prompt, ...imageParts]),
       ]);
 
       if (response.text != null) {
