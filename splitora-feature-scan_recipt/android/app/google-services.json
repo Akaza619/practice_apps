@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "282557622679",
+    "project_id": "splitora-8a9fe",
+    "storage_bucket": "splitora-8a9fe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282557622679:android:55ed587f9b61d3b3b23cd2",
+        "android_client_info": {
+          "package_name": "com.example.splitora_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOM0Chs4RW-hEcmSf6ieSj6LAOkwxJ9gI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
