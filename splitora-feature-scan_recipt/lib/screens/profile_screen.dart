@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:splitora_app/controllers/auth_controller.dart';
 import 'package:splitora_app/theme/app_theme.dart';
+import 'package:splitora_app/widgets/user_avatar.dart';
 import 'dart:ui';
 
 class ProfileScreen extends StatefulWidget {
@@ -59,6 +62,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showImagePickerOptions() {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppTheme.textPrimary),
+              title: const Text('Gallery', style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () {
+                Get.back();
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppTheme.textPrimary),
+              title: const Text('Camera', style: TextStyle(color: AppTheme.textPrimary)),
+              onTap: () {
+                Get.back();
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            if (AuthController.instance.photoURL.value.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.redAccent),
+                title: const Text('Remove Image', style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Get.back();
+                  AuthController.instance.clearProfileImage();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    await AuthController.instance.pickAndSaveProfileImage(source);
+  }
+
   @override
   void dispose() {
     firstNameController.dispose();
@@ -100,15 +158,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const CircleAvatar(
-                                  radius: 50,
-                                  backgroundColor: AppTheme.avatarBackground,
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
+                                Obx(() {
+                                  final url = AuthController.instance.photoURL.value;
+                                  return GestureDetector(
+                                    onTap: _showImagePickerOptions,
+                                    child: Stack(
+                                      children: [
+                                        UserAvatar(
+                                          radius: 50,
+                                          photoURL: url,
+                                          displayName:
+                                              '${firstNameController.text} ${lastNameController.text}',
+                                          firstName: firstNameController.text,
+                                        ),
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: const BoxDecoration(
+                                              color: AppTheme.fabBackground,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.camera_alt,
+                                              size: 18,
+                                              color: AppTheme.buttonForeground,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
                                 const SizedBox(height: 20),
                                 const Text(
                                   "Profile Details",

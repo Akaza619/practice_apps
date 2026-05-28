@@ -29,10 +29,11 @@ class BillController extends GetxController {
     try {
       final currentUserId = _auth.currentUser!.uid;
       final snapshot = await _firestore.collection('users').get();
-      final list = snapshot.docs
-          .map((d) => d.data())
-          .where((u) => u['uid'] != currentUserId)
-          .toList();
+      final list =
+          snapshot.docs
+              .map((d) => d.data())
+              .where((u) => u['uid'] != currentUserId)
+              .toList();
       allUsers.value = list;
       filteredUsers.value = list;
     } catch (_) {}
@@ -41,11 +42,12 @@ class BillController extends GetxController {
   void fetchGroups() async {
     try {
       final currentUserId = _auth.currentUser!.uid;
-      final snapshot = await _firestore
-          .collection('chats')
-          .where('isGroup', isEqualTo: true)
-          .where('participants', arrayContains: currentUserId)
-          .get();
+      final snapshot =
+          await _firestore
+              .collection('chats')
+              .where('isGroup', isEqualTo: true)
+              .where('participants', arrayContains: currentUserId)
+              .get();
       allGroups.value = snapshot.docs.map((d) => d.data()).toList();
     } catch (_) {}
   }
@@ -54,13 +56,14 @@ class BillController extends GetxController {
     if (query.isEmpty) {
       filteredUsers.value = allUsers;
     } else {
-      filteredUsers.value = allUsers.where((u) {
-        final name =
-            (u['displayName'] ?? u['firstName'] ?? '').toLowerCase();
-        final email = (u['email'] ?? '').toLowerCase();
-        return name.contains(query.toLowerCase()) ||
-            email.contains(query.toLowerCase());
-      }).toList();
+      filteredUsers.value =
+          allUsers.where((u) {
+            final name =
+                (u['displayName'] ?? u['firstName'] ?? '').toLowerCase();
+            final email = (u['email'] ?? '').toLowerCase();
+            return name.contains(query.toLowerCase()) ||
+                email.contains(query.toLowerCase());
+          }).toList();
     }
   }
 
@@ -132,19 +135,20 @@ class BillController extends GetxController {
       String? groupName;
 
       if (isGroupMode.value) {
-        final chatDoc = await _firestore
-            .collection('chats')
-            .doc(selectedGroupId.value)
-            .get();
+        final chatDoc =
+            await _firestore
+                .collection('chats')
+                .doc(selectedGroupId.value)
+                .get();
         final chatData = chatDoc.data() as Map<String, dynamic>;
-        participantIds =
-            List<String>.from(chatData['participants'] ?? [currentUserId]);
+        participantIds = List<String>.from(
+          chatData['participants'] ?? [currentUserId],
+        );
         groupId = selectedGroupId.value;
         groupName = selectedGroupName.value;
 
         for (final uid in participantIds) {
-          final pDoc =
-              await _firestore.collection('users').doc(uid).get();
+          final pDoc = await _firestore.collection('users').doc(uid).get();
           if (pDoc.exists) {
             final pData = pDoc.data() as Map<String, dynamic>;
             participantNames[uid] =
@@ -155,8 +159,7 @@ class BillController extends GetxController {
         participantIds = [currentUserId, ...selectedUserIds];
         participantNames[currentUserId] = creatorName;
         for (final uid in selectedUserIds) {
-          final match =
-              allUsers.firstWhereOrNull((u) => u['uid'] == uid);
+          final match = allUsers.firstWhereOrNull((u) => u['uid'] == uid);
           if (match != null) {
             participantNames[uid] =
                 match['displayName'] ?? match['firstName'] ?? 'Unknown';
@@ -165,8 +168,7 @@ class BillController extends GetxController {
       }
 
       final double perPerson = amount / participantIds.length;
-      final String billId =
-          _firestore.collection('bills').doc().id;
+      final String billId = _firestore.collection('bills').doc().id;
 
       await _firestore.collection('bills').doc(billId).set({
         'billId': billId,
@@ -228,41 +230,181 @@ class BillController extends GetxController {
         "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
     final String msg;
     if (receiptImageUrl != null) {
-      msg = "🧾 Scanned Receipt: $tripName\n"
+      msg =
+          "🧾 Scanned Receipt: $tripName\n"
           "Total: ₹${amount.toStringAsFixed(2)}  •  Per person: ₹${perPerson.toStringAsFixed(2)}\n"
           "Date: $dateStr  •  Paid by: $creatorName\n"
           "📄 This bill was generated from a scanned receipt.";
     } else {
-      msg = "💰 Trip Bill: $tripName\n"
+      msg =
+          "💰 Trip Bill: $tripName\n"
           "Total: ₹${amount.toStringAsFixed(2)}  •  Per person: ₹${perPerson.toStringAsFixed(2)}\n"
           "Date: $dateStr  •  Paid by: $creatorName";
     }
 
     if (isGroupBill && groupId != null) {
-      await chatController.sendMessage(groupId, msg, isGroup: true, imageUrl: receiptImageUrl);
+      await chatController.sendMessage(
+        groupId,
+        msg,
+        isGroup: true,
+        imageUrl: receiptImageUrl,
+      );
     } else {
       for (final uid in participantIds) {
         if (uid == creatorId) continue;
-        final match =
-            allUsers.firstWhereOrNull((u) => u['uid'] == uid);
-        final name = match != null
-            ? (match['displayName'] ?? match['firstName'] ?? 'User')
-            : 'User';
-        final chatId =
-            await chatController.createOrGetChat(uid, name);
-        await chatController.sendMessage(chatId, msg, isGroup: false, imageUrl: receiptImageUrl);
+        final match = allUsers.firstWhereOrNull((u) => u['uid'] == uid);
+        final name =
+            match != null
+                ? (match['displayName'] ?? match['firstName'] ?? 'User')
+                : 'User';
+        final chatId = await chatController.createOrGetChat(uid, name);
+        await chatController.sendMessage(
+          chatId,
+          msg,
+          isGroup: false,
+          imageUrl: receiptImageUrl,
+        );
       }
+    }
+  }
+
+  Future<bool> updateBill({
+    required String billId,
+    required double totalAmount,
+    List<Map<String, dynamic>>? manualItems,
+    required List<String> updatedParticipantIds,
+    required Map<String, dynamic> updatedParticipantNames,
+    String? groupId,
+    String? groupName,
+  }) async {
+    try {
+      final currentUserId = _auth.currentUser!.uid;
+      final billRef = _firestore.collection('bills').doc(billId);
+      final billDoc = await billRef.get();
+      final billData = billDoc.data() as Map<String, dynamic>;
+
+      if (billData['settled'] == true) {
+        _error("Cannot modify a settled bill");
+        return false;
+      }
+      if (billData['createdBy'] != currentUserId) {
+        _error("Only the bill creator can modify this bill");
+        return false;
+      }
+
+      // Keep existing settledBy for users still in participants
+      final existingSettledBy = List<String>.from(billData['settledBy'] ?? []);
+      final filteredSettledBy =
+          existingSettledBy
+              .where((uid) => updatedParticipantIds.contains(uid))
+              .toList();
+      final double perPerson = totalAmount / updatedParticipantIds.length;
+
+      final now = DateTime.now();
+      final Map<String, dynamic> updates = {
+        'totalAmount': totalAmount,
+        'perPersonAmount': perPerson,
+        'participants': updatedParticipantIds,
+        'participantNames': updatedParticipantNames,
+        'settledBy': filteredSettledBy,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (groupId != null) 'groupId': groupId,
+        if (groupName != null) 'groupName': groupName,
+      };
+
+      if (manualItems != null) {
+        updates['manualItems'] = manualItems;
+      } else {
+        // If no manualItems, remove the field
+        updates['manualItems'] = FieldValue.delete();
+      }
+
+      // If the bill had scan data, update its line items from manualItems
+      if (billData['receiptScanData'] != null && manualItems != null) {
+        final scanData = Map<String, dynamic>.from(
+          billData['receiptScanData'] as Map,
+        );
+        scanData['line_items'] =
+            manualItems
+                .map(
+                  (item) => {
+                    'name': item['name'],
+                    'quantity': item['quantity'],
+                    'unit_price': (item['amount'] as num).toDouble(),
+                    'total_price':
+                        (item['quantity'] as num) * (item['amount'] as num),
+                  },
+                )
+                .toList();
+        updates['receiptScanData'] = scanData;
+      }
+
+      await billRef.update(updates);
+
+      // Check if bill is now fully settled after filtering
+      final allPaid = updatedParticipantIds
+          .where((p) => p != currentUserId)
+          .every((p) => filteredSettledBy.contains(p));
+      if (allPaid && updatedParticipantIds.length > 1) {
+        await billRef.update({'settled': true});
+      } else {
+        await billRef.update({'settled': false});
+      }
+
+      // Notify participants about the update
+      final creatorName =
+          billData['createdByName'] as String? ?? 'The organiser';
+      final date = billData['date'] as Timestamp?;
+      final dateStr =
+          date != null
+              ? "${date.toDate().day}/${date.toDate().month}/${date.toDate().year}"
+              : '';
+      final msg =
+          "✏️ Bill updated: ${billData['tripName']}\n"
+          "New total: ₹${totalAmount.toStringAsFixed(2)}  •  "
+          "Per person: ₹${perPerson.toStringAsFixed(2)}\n"
+          "Date: $dateStr  •  Paid by: $creatorName";
+
+      final chatController = Get.put(ChatController());
+      if (groupId != null && groupId.isNotEmpty) {
+        await chatController.sendMessage(groupId, msg, isGroup: true);
+      } else {
+        for (final uid in updatedParticipantIds) {
+          if (uid == currentUserId) continue;
+          final match = allUsers.firstWhereOrNull((u) => u['uid'] == uid);
+          final name =
+              match != null
+                  ? (match['displayName'] ?? match['firstName'] ?? 'User')
+                  : 'User';
+          final chatId = await chatController.createOrGetChat(uid, name);
+          await chatController.sendMessage(chatId, msg, isGroup: false);
+        }
+      }
+
+      Get.snackbar(
+        "Bill Updated",
+        "All changes have been saved and shared.",
+        backgroundColor: Colors.green.shade400,
+        colorText: Colors.white,
+      );
+      return true;
+    } catch (e) {
+      _error("Failed to update bill: $e");
+      return false;
     }
   }
 
   Future<void> settleBill(String billId) async {
     try {
-      await _firestore
-          .collection('bills')
-          .doc(billId)
-          .update({'settled': true});
-      Get.snackbar("Done", "Bill marked as settled.",
-          backgroundColor: Colors.green.shade300, colorText: Colors.black87);
+      await _firestore.collection('bills').doc(billId).update({
+        'settled': true,
+      });
+      Get.snackbar(
+        "Done",
+        "Bill marked as settled.",
+        backgroundColor: Colors.green.shade300,
+        colorText: Colors.black87,
+      );
     } catch (e) {
       _error("Could not settle bill: $e");
     }
@@ -285,8 +427,7 @@ class BillController extends GetxController {
       });
 
       // Re-fetch to check if all non-creators have now paid
-      final billDoc =
-          await _firestore.collection('bills').doc(billId).get();
+      final billDoc = await _firestore.collection('bills').doc(billId).get();
       final data = billDoc.data() as Map<String, dynamic>;
 
       final participants = List<String>.from(data['participants'] ?? []);
@@ -301,10 +442,9 @@ class BillController extends GetxController {
           .every((p) => settledBy.contains(p));
 
       if (allPaid) {
-        await _firestore
-            .collection('bills')
-            .doc(billId)
-            .update({'settled': true});
+        await _firestore.collection('bills').doc(billId).update({
+          'settled': true,
+        });
       }
 
       // Notify via chat
@@ -321,8 +461,10 @@ class BillController extends GetxController {
         final creatorData = creatorDoc.data() as Map<String, dynamic>;
         final creatorName =
             creatorData['displayName'] ?? creatorData['firstName'] ?? 'User';
-        final chatId =
-            await chatController.createOrGetChat(createdBy, creatorName);
+        final chatId = await chatController.createOrGetChat(
+          createdBy,
+          creatorName,
+        );
         await chatController.sendMessage(chatId, msg, isGroup: false);
       }
 

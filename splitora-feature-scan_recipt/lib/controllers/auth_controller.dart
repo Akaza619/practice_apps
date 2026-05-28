@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:splitora_app/screens/main_screen.dart';
 import 'package:splitora_app/screens/login.dart';
 
@@ -9,6 +13,7 @@ class AuthController extends GetxController {
   static AuthController instance = Get.find();
   late Rx<User?> _user;
   FirebaseAuth auth = FirebaseAuth.instance;
+  RxString photoURL = ''.obs;
 
   @override
   void onReady() {
@@ -16,6 +21,95 @@ class AuthController extends GetxController {
     _user = Rx<User?>(auth.currentUser);
     _user.bindStream(auth.userChanges());
     ever(_user, _initialScreen);
+    _loadPhotoURL();
+  }
+
+  Future<void> _loadPhotoURL() async {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (doc.exists) {
+      final url = doc.data()?['photoURL'] as String? ?? '';
+      photoURL.value = url;
+    }
+  }
+
+  Future<String?> pickAndSaveProfileImage([ImageSource source = ImageSource.gallery]) async {
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+    if (picked == null) return null;
+
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return null;
+
+    // Delete old local image if exists
+    if (photoURL.value.isNotEmpty) {
+      final oldFile = File(photoURL.value);
+      if (oldFile.existsSync()) {
+        await oldFile.delete();
+      }
+    }
+
+    // Save to local app directory
+    final appDir = await getApplicationDocumentsDirectory();
+    final imageDir = Directory('${appDir.path}/profile_images');
+    if (!await imageDir.exists()) {
+      await imageDir.create(recursive: true);
+    }
+    final newPath = '${imageDir.path}/$uid.jpg';
+    await File(picked.path).copy(newPath);
+
+    // Save locally
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profile_image_$uid', newPath);
+
+    // Save to Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .update({'photoURL': newPath});
+
+    photoURL.value = newPath;
+    return newPath;
+  }
+
+  Future<void> clearProfileImage() async {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return;
+
+    // Delete local file
+    if (photoURL.value.isNotEmpty) {
+      final file = File(photoURL.value);
+      if (file.existsSync()) {
+        await file.delete();
+      }
+    }
+
+    // Clear SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('profile_image_$uid');
+
+    // Clear Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .update({'photoURL': ''});
+
+    photoURL.value = '';
+  }
+
+  Future<String?> getLocalProfileImage() async {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return null;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('profile_image_$uid');
   }
 
   void _initialScreen(User? user) {

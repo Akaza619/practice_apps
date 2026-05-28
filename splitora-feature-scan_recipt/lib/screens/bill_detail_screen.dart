@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:splitora_app/controllers/bill_controller.dart';
+import 'package:splitora_app/screens/bill_edit_screen.dart';
 import 'package:splitora_app/theme/app_theme.dart';
 
 const _kRazorpayKey = 'rzp_test_SUOCoHmBlkGdb7';
@@ -122,11 +122,30 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
         (d['manualItems'] as List<dynamic>?)?.cast<Map<String, dynamic>>();
     final receiptScanData = d['receiptScanData'] as Map<String, dynamic>?;
 
+    final bool canEdit = iCreated && !settled;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Bill Details"),
         backgroundColor: AppTheme.appBarColor,
         elevation: 0,
+        actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: "Edit Bill",
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => BillEditScreen(data: d),
+                  ),
+                );
+                if (result == true && mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+        ],
       ),
       body: Container(
         decoration: AppTheme.backgroundDecoration,
@@ -191,11 +210,11 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
                   const SizedBox(height: 16),
                 ],
 
-                // ── Manual items ────────────────────────────────────────────
-                if (manualItems != null && manualItems.isNotEmpty) ...[
-                  _buildManualItems(manualItems),
-                  const SizedBox(height: 16),
-                ],
+              // ── Manual items (hide if already shown in scan details) ─────
+              if (manualItems != null && manualItems.isNotEmpty && receiptScanData == null) ...[
+                _buildManualItems(manualItems),
+                const SizedBox(height: 16),
+              ],
 
                 // ── Participants ────────────────────────────────────────────
                 _buildParticipants(
