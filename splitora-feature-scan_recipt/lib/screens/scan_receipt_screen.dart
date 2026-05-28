@@ -688,6 +688,7 @@ class _SplitBillSheetState extends State<_SplitBillSheet> {
       date: date,
       note: note,
       receiptImageUrl: imageUrl,
+      receiptScanData: r.toJson(),
     );
 
     if (success) {

@@ -1,6 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReceiptImageData {
   final String filePath;
@@ -39,10 +40,20 @@ class ReceiptStorageService {
   static final ReceiptStorageService instance = ReceiptStorageService._();
   ReceiptStorageService._();
 
-  static const _boxName = 'receipts';
+  static const _storageKey = 'receipt_paths';
+  Map<String, String> _cache = {};
 
   Future<void> init() async {
-    await Hive.openBox<String>(_boxName);
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_storageKey);
+    if (stored != null) {
+      _cache = Map<String, String>.from(jsonDecode(stored) as Map);
+    }
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(_cache));
   }
 
   Future<String> saveReceiptImage(String billId, File imageFile) async {
@@ -55,14 +66,13 @@ class ReceiptStorageService {
     final newPath = '${receiptDir.path}/$billId.$extension';
     await imageFile.copy(newPath);
 
-    final box = Hive.box<String>(_boxName);
-    await box.put(billId, newPath);
+    _cache[billId] = newPath;
+    await _persist();
     return newPath;
   }
 
   String? getReceiptPath(String billId) {
-    final box = Hive.box<String>(_boxName);
-    return box.get(billId);
+    return _cache[billId];
   }
 
   bool receiptExists(String billId) {
@@ -72,14 +82,14 @@ class ReceiptStorageService {
   }
 
   Future<void> deleteReceipt(String billId) async {
-    final box = Hive.box<String>(_boxName);
-    final path = box.get(billId);
+    final path = _cache[billId];
     if (path != null) {
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
       }
-      await box.delete(billId);
+      _cache.remove(billId);
+      await _persist();
     }
   }
 

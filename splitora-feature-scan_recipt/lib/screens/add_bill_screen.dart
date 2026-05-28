@@ -14,14 +14,28 @@ class AddBillScreen extends StatefulWidget {
   State<AddBillScreen> createState() => _AddBillScreenState();
 }
 
+class _LineItem {
+  final String name;
+  final int quantity;
+  final double amount;
+
+  _LineItem({required this.name, required this.quantity, required this.amount});
+
+  double get total => quantity * amount;
+}
+
 class _AddBillScreenState extends State<AddBillScreen> {
   late final BillController _controller;
   final _tripCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _searchCtrl = TextEditingController();
+  final _itemNameCtrl = TextEditingController();
+  final _itemQtyCtrl = TextEditingController();
+  final _itemAmountCtrl = TextEditingController();
   final _isFormValid = false.obs;
   DateTime _selectedDateTime = DateTime.now();
+  final List<_LineItem> _items = [];
 
   @override
   void initState() {
@@ -40,6 +54,32 @@ class _AddBillScreenState extends State<AddBillScreen> {
     _isFormValid.value = tripValid && amount > 0;
   }
 
+  void _addItem() {
+    final name = _itemNameCtrl.text.trim();
+    final qty = int.tryParse(_itemQtyCtrl.text.trim());
+    final amt = double.tryParse(_itemAmountCtrl.text.trim());
+    if (name.isEmpty || qty == null || qty <= 0 || amt == null || amt <= 0) {
+      return;
+    }
+    setState(() {
+      _items.add(_LineItem(name: name, quantity: qty, amount: amt));
+    });
+    _itemNameCtrl.clear();
+    _itemQtyCtrl.clear();
+    _itemAmountCtrl.clear();
+  }
+
+  void _removeItem(int index) {
+    setState(() {
+      _items.removeAt(index);
+    });
+  }
+
+  void _calculateTotal() {
+    final total = _items.fold<double>(0, (sum, item) => sum + item.total);
+    _amountCtrl.text = total.toStringAsFixed(2);
+  }
+
   @override
   void dispose() {
     _tripCtrl.removeListener(_updateFormValidity);
@@ -48,6 +88,9 @@ class _AddBillScreenState extends State<AddBillScreen> {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
     _searchCtrl.dispose();
+    _itemNameCtrl.dispose();
+    _itemQtyCtrl.dispose();
+    _itemAmountCtrl.dispose();
     super.dispose();
   }
 
@@ -66,18 +109,29 @@ class _AddBillScreenState extends State<AddBillScreen> {
     if (time != null) {
       setState(() {
         _selectedDateTime = DateTime(
-            date.year, date.month, date.day, time.hour, time.minute);
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
       });
     }
   }
 
   Future<void> _submit() async {
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final items = _items.map((item) => {
+      'name': item.name,
+      'quantity': item.quantity,
+      'amount': item.amount,
+    }).toList();
     final success = await _controller.createBill(
       tripName: _tripCtrl.text.trim(),
       amount: amount,
       date: _selectedDateTime,
       note: _noteCtrl.text.trim(),
+      manualItems: items,
     );
     if (success && mounted) {
       Get.back();
@@ -114,6 +168,10 @@ class _AddBillScreenState extends State<AddBillScreen> {
                     ),
                     const SizedBox(height: 12),
                     _dateTimePicker(),
+                    const SizedBox(height: 16),
+
+                    // ── Items ──────────────────────────────────────
+                    _itemsSection(),
                     const SizedBox(height: 12),
                     _field(_noteCtrl, "Note (optional)", Icons.note_alt),
                   ],
@@ -129,9 +187,12 @@ class _AddBillScreenState extends State<AddBillScreen> {
                   children: [
                     Obx(() => _modeToggle()),
                     const SizedBox(height: 12),
-                    Obx(() => _controller.isGroupMode.value
-                        ? _groupSelector()
-                        : _individualSelector()),
+                    Obx(
+                      () =>
+                          _controller.isGroupMode.value
+                              ? _groupSelector()
+                              : _individualSelector(),
+                    ),
                   ],
                 ),
               ),
@@ -139,10 +200,12 @@ class _AddBillScreenState extends State<AddBillScreen> {
 
               // ── Submit ────────────────────────────────────────────────
               Obx(() {
-                final bool hasParticipants = _controller.isGroupMode.value
-                    ? _controller.selectedGroupId.value.isNotEmpty
-                    : _controller.selectedUserIds.isNotEmpty;
-                final bool canSubmit = _isFormValid.value &&
+                final bool hasParticipants =
+                    _controller.isGroupMode.value
+                        ? _controller.selectedGroupId.value.isNotEmpty
+                        : _controller.selectedUserIds.isNotEmpty;
+                final bool canSubmit =
+                    _isFormValid.value &&
                     hasParticipants &&
                     !_controller.isLoading.value;
                 return SizedBox(
@@ -156,24 +219,25 @@ class _AddBillScreenState extends State<AddBillScreen> {
                           AppTheme.disabledButtonBackground,
                       disabledForegroundColor:
                           AppTheme.disabledButtonForeground,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
-                    child: _controller.isLoading.value
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2),
-                          )
-                        : const Text(
-                            "ADD BILL",
-                            style: TextStyle(
+                    child:
+                        _controller.isLoading.value
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Text(
+                              "ADD BILL",
+                              style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold),
-                          ),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                   ),
                 );
               }),
@@ -223,8 +287,7 @@ class _AddBillScreenState extends State<AddBillScreen> {
           decoration: InputDecoration(
             hintText: "Search by name or email...",
             hintStyle: const TextStyle(color: AppTheme.textTertiary),
-            prefixIcon:
-                const Icon(Icons.search, color: AppTheme.iconColor),
+            prefixIcon: const Icon(Icons.search, color: AppTheme.iconColor),
             filled: true,
             fillColor: AppTheme.inputFill,
             border: OutlineInputBorder(
@@ -232,7 +295,9 @@ class _AddBillScreenState extends State<AddBillScreen> {
               borderSide: BorderSide.none,
             ),
             contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20, vertical: 10),
+              horizontal: 20,
+              vertical: 10,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -241,9 +306,10 @@ class _AddBillScreenState extends State<AddBillScreen> {
           child: Obx(() {
             if (_controller.filteredUsers.isEmpty) {
               return const Center(
-                child: Text("No users found",
-                    style:
-                        TextStyle(color: AppTheme.textSecondary)),
+                child: Text(
+                  "No users found",
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
               );
             }
             return ListView.builder(
@@ -251,45 +317,43 @@ class _AddBillScreenState extends State<AddBillScreen> {
               itemBuilder: (context, index) {
                 final user = _controller.filteredUsers[index];
                 return Obx(() {
-                  final bool selected = _controller.selectedUserIds
-                      .contains(user['uid']);
+                  final bool selected = _controller.selectedUserIds.contains(
+                    user['uid'],
+                  );
                   return ListTile(
                     dense: true,
-                    onTap: () =>
-                        _controller.toggleUser(user['uid']),
+                    onTap: () => _controller.toggleUser(user['uid']),
                     leading: CircleAvatar(
                       radius: 16,
                       backgroundColor: AppTheme.avatarBackground,
                       child: Text(
-                        (user['firstName'] ?? 'U')[0]
-                            .toUpperCase(),
+                        (user['firstName'] ?? 'U')[0].toUpperCase(),
                         style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 12),
+                          color: AppTheme.textPrimary,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     title: Text(
-                      user['displayName'] ??
-                          user['firstName'] ??
-                          'Unknown',
+                      user['displayName'] ?? user['firstName'] ?? 'Unknown',
                       style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 14),
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                      ),
                     ),
                     subtitle: Text(
                       user['email'] ?? '',
                       style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11),
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                      ),
                     ),
                     trailing: Checkbox(
                       value: selected,
-                      onChanged: (_) =>
-                          _controller.toggleUser(user['uid']),
+                      onChanged: (_) => _controller.toggleUser(user['uid']),
                       activeColor: AppTheme.checkboxActive,
                       checkColor: AppTheme.checkboxCheck,
-                      side: const BorderSide(
-                          color: AppTheme.textPrimary),
+                      side: const BorderSide(color: AppTheme.textPrimary),
                     ),
                   );
                 });
@@ -330,18 +394,23 @@ class _AddBillScreenState extends State<AddBillScreen> {
                 leading: CircleAvatar(
                   radius: 16,
                   backgroundColor: AppTheme.avatarBackground,
-                  child: const Icon(Icons.group,
-                      color: AppTheme.textPrimary, size: 16),
+                  child: const Icon(
+                    Icons.group,
+                    color: AppTheme.textPrimary,
+                    size: 16,
+                  ),
                 ),
-                title: Text(gName,
-                    style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 14)),
+                title: Text(
+                  gName,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                  ),
+                ),
                 trailing: Radio<String>(
                   value: gId,
                   groupValue: _controller.selectedGroupId.value,
-                  onChanged: (_) =>
-                      _controller.selectGroup(gId, gName),
+                  onChanged: (_) => _controller.selectGroup(gId, gName),
                   activeColor: AppTheme.checkboxActive,
                 ),
               );
@@ -356,25 +425,199 @@ class _AddBillScreenState extends State<AddBillScreen> {
     return GestureDetector(
       onTap: _pickDateTime,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppTheme.inputFill,
           borderRadius: BorderRadius.circular(30),
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today,
-                color: AppTheme.iconColor),
+            const Icon(Icons.calendar_today, color: AppTheme.iconColor),
             const SizedBox(width: 12),
             Text(
-              DateFormat('dd MMM yyyy  •  hh:mm a')
-                  .format(_selectedDateTime),
-              style:
-                  const TextStyle(color: AppTheme.textPrimary),
+              DateFormat('dd MMM yyyy  •  hh:mm a').format(_selectedDateTime),
+              style: const TextStyle(color: AppTheme.textPrimary),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Items ─────────────────────────────────────────────────────────────
+
+  Widget _itemsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Items",
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_items.isNotEmpty) _itemList(),
+        const SizedBox(height: 8),
+        _itemInputRow(),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _items.isEmpty ? null : _calculateTotal,
+            icon: const Icon(Icons.calculate, size: 18),
+            label: const Text("Calculate Total"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.fabBackground,
+              foregroundColor: AppTheme.buttonForeground,
+              disabledBackgroundColor: AppTheme.disabledButtonBackground,
+              disabledForegroundColor: AppTheme.disabledButtonForeground,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _itemList() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.inputFill,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        children: List.generate(_items.length, (i) {
+          final item = _items[i];
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    item.name,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    "×${item.quantity}",
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    "₹${item.amount.toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _removeItem(i),
+                  child: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: AppTheme.errorColor,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _itemInputRow() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: _miniField(_itemNameCtrl, "Name", Icons.label_outline),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 2,
+          child: _miniField(
+            _itemQtyCtrl,
+            "Qty",
+            Icons.format_list_numbered,
+            keyboard: TextInputType.number,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 2,
+          child: _miniField(
+            _itemAmountCtrl,
+            "₹",
+            Icons.currency_rupee,
+            keyboard: TextInputType.number,
+          ),
+        ),
+        const SizedBox(width: 6),
+        GestureDetector(
+          onTap: _addItem,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppTheme.fabBackground,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Icon(Icons.add, color: AppTheme.buttonForeground),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _miniField(
+    TextEditingController ctrl,
+    String hint,
+    IconData icon, {
+    TextInputType keyboard = TextInputType.text,
+  }) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboard,
+      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, size: 16, color: AppTheme.iconColor),
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppTheme.textTertiary, fontSize: 12),
+        filled: true,
+        fillColor: AppTheme.inputFill,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        isDense: true,
       ),
     );
   }
@@ -392,8 +635,7 @@ class _AddBillScreenState extends State<AddBillScreen> {
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: AppTheme.iconColor),
         hintText: hint,
-        hintStyle:
-            const TextStyle(color: AppTheme.textTertiary),
+        hintStyle: const TextStyle(color: AppTheme.textTertiary),
         filled: true,
         fillColor: AppTheme.inputFill,
         border: OutlineInputBorder(
@@ -401,7 +643,9 @@ class _AddBillScreenState extends State<AddBillScreen> {
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20, vertical: 15),
+          horizontal: 20,
+          vertical: 15,
+        ),
       ),
     );
   }
@@ -444,10 +688,11 @@ class _ToggleOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _ToggleOption(
-      {required this.label,
-      required this.selected,
-      required this.onTap});
+  const _ToggleOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -457,21 +702,16 @@ class _ToggleOption extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.fabBackground
-                : Colors.transparent,
+            color: selected ? AppTheme.fabBackground : Colors.transparent,
             borderRadius: BorderRadius.circular(30),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: selected
-                  ? AppTheme.buttonForeground
-                  : AppTheme.textSecondary,
-              fontWeight: selected
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+              color:
+                  selected ? AppTheme.buttonForeground : AppTheme.textSecondary,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ),

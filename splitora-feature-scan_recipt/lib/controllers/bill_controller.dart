@@ -97,6 +97,8 @@ class BillController extends GetxController {
     required DateTime date,
     String note = '',
     String? receiptImageUrl,
+    List<Map<String, dynamic>>? manualItems,
+    Map<String, dynamic>? receiptScanData,
   }) async {
     if (tripName.isEmpty) {
       _error("Trip name is required");
@@ -182,6 +184,8 @@ class BillController extends GetxController {
         'note': note,
         'createdAt': FieldValue.serverTimestamp(),
         if (receiptImageUrl != null) 'receiptImageUrl': receiptImageUrl,
+        if (manualItems != null) 'manualItems': manualItems,
+        if (receiptScanData != null) 'receiptScanData': receiptScanData,
       });
 
       await _notifyChats(
