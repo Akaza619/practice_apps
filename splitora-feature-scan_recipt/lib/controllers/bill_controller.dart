@@ -480,6 +480,64 @@ class BillController extends GetxController {
     }
   }
 
+  /// Deletes a bill permanently. Only the creator can delete.
+  /// Sends a chat notification to all participants.
+  Future<bool> deleteBill(String billId) async {
+    try {
+      final currentUserId = _auth.currentUser!.uid;
+      final billRef = _firestore.collection('bills').doc(billId);
+      final billDoc = await billRef.get();
+
+      if (!billDoc.exists) {
+        _error("Bill not found");
+        return false;
+      }
+
+      final billData = billDoc.data() as Map<String, dynamic>;
+
+      if (billData['createdBy'] != currentUserId) {
+        _error("Only the bill creator can delete this bill");
+        return false;
+      }
+
+      final tripName = billData['tripName'] as String? ?? '';
+      final participantIds = List<String>.from(billData['participants'] ?? []);
+      final groupId = billData['groupId'] as String?;
+
+      // Delete the bill document
+      await billRef.delete();
+
+      // Notify participants via chat
+      final chatController = Get.put(ChatController());
+      final msg = "🗑️ Bill deleted: $tripName\nThis bill has been removed by the creator.";
+
+      if (groupId != null && groupId.isNotEmpty) {
+        await chatController.sendMessage(groupId, msg, isGroup: true);
+      } else {
+        for (final uid in participantIds) {
+          if (uid == currentUserId) continue;
+          final match = allUsers.firstWhereOrNull((u) => u['uid'] == uid);
+          final name = match != null
+              ? (match['displayName'] ?? match['firstName'] ?? 'User')
+              : 'User';
+          final chatId = await chatController.createOrGetChat(uid, name);
+          await chatController.sendMessage(chatId, msg, isGroup: false);
+        }
+      }
+
+      Get.snackbar(
+        "Bill Deleted",
+        "\"$tripName\" has been removed permanently.",
+        backgroundColor: Colors.green.shade400,
+        colorText: Colors.white,
+      );
+      return true;
+    } catch (e) {
+      _error("Failed to delete bill: $e");
+      return false;
+    }
+  }
+
   /// Returns all bills involving the current user (unsorted — sort client-side).
   Stream<QuerySnapshot> getBillsStream() {
     final uid = _auth.currentUser!.uid;

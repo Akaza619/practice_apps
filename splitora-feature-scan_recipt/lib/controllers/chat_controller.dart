@@ -89,4 +89,30 @@ class ChatController extends GetxController {
         .orderBy('timestamp', descending: true)
         .snapshots();
   }
+
+  /// Delete a message. [forEveryone] only allowed for the sender.
+  Future<void> deleteMessage({
+    required String chatId,
+    required String messageId,
+    required bool forEveryone,
+  }) async {
+    final currentUserId = _auth.currentUser!.uid;
+    final msgRef = _firestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .doc(messageId);
+
+    if (forEveryone) {
+      await msgRef.update({
+        'text': 'This message was deleted.',
+        'deletedForEveryone': true,
+        'imageUrl': FieldValue.delete(),
+      });
+    } else {
+      await msgRef.update({
+        'deletedFor': FieldValue.arrayUnion([currentUserId]),
+      });
+    }
+  }
 }

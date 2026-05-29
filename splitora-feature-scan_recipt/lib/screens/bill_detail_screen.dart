@@ -65,6 +65,49 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
     );
   }
 
+  void _confirmDelete(BuildContext context, Map<String, dynamic> d) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text(
+          "Delete Bill",
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          "This will permanently remove this bill for all members. This action cannot be undone.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final billId = d['billId'] as String? ?? '';
+              final deleted = await _controller.deleteBill(billId);
+              if (deleted && mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text(
+              "Delete",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openRazorpay() {
     final perPerson = (widget.data['perPersonAmount'] as num).toDouble();
     final tripName = widget.data['tripName'] ?? 'Trip Bill';
@@ -130,7 +173,12 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
         backgroundColor: AppTheme.appBarColor,
         elevation: 0,
         actions: [
-          if (canEdit)
+          if (canEdit) ...[
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: "Delete Bill",
+              onPressed: () => _confirmDelete(context, d),
+            ),
             IconButton(
               icon: const Icon(Icons.edit_rounded),
               tooltip: "Edit Bill",
@@ -145,6 +193,7 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
                 }
               },
             ),
+          ],
         ],
       ),
       body: Container(

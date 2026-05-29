@@ -137,21 +137,20 @@ class _DashboardState extends State<Dashboard> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(
-              color: AppTheme.textPrimary,
-            ),
+            child: CircularProgressIndicator(color: AppTheme.textPrimary),
           );
         }
 
         // Only show bills that are unsettled AND the current user hasn't paid yet
-        final pending = (snapshot.data?.docs ?? []).where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          if (data['settled'] == true) return false;
-          final bool iCreated = data['createdBy'] == currentUserId;
-          if (iCreated) return true; // creator waits until everyone pays
-          final settledBy = List<String>.from(data['settledBy'] ?? []);
-          return !settledBy.contains(currentUserId);
-        }).toList();
+        final pending =
+            (snapshot.data?.docs ?? []).where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              if (data['settled'] == true) return false;
+              final bool iCreated = data['createdBy'] == currentUserId;
+              if (iCreated) return true; // creator waits until everyone pays
+              final settledBy = List<String>.from(data['settledBy'] ?? []);
+              return !settledBy.contains(currentUserId);
+            }).toList();
 
         if (pending.isEmpty) {
           return Container(
@@ -169,83 +168,136 @@ class _DashboardState extends State<Dashboard> {
 
         return Column(
           children: List.generate(itemCount, (index) {
-            final data =
-                pending[index].data() as Map<String, dynamic>;
+            final data = pending[index].data() as Map<String, dynamic>;
             final bool iCreated = data['createdBy'] == currentUserId;
-            final double total =
-                (data['totalAmount'] as num).toDouble();
+            final double total = (data['totalAmount'] as num).toDouble();
             final double perPerson =
                 (data['perPersonAmount'] as num).toDouble();
             final int memberCount =
                 (data['participants'] as List?)?.length ?? 1;
             final String tripName = data['tripName'] ?? '';
 
-            final docData =
-                pending[index].data() as Map<String, dynamic>;
+            final docData = pending[index].data() as Map<String, dynamic>;
             return GestureDetector(
               onTap: () => showBillDetail(context, docData),
               child: Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              padding: const EdgeInsets.all(15),
-              decoration: AppTheme.listTileDecoration,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.all(15),
+                decoration: AppTheme.listTileDecoration,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tripName,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "$memberCount members",
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          tripName,
+                          "₹${iCreated ? total.toStringAsFixed(2) : perPerson.toStringAsFixed(2)}",
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          "$memberCount members",
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
+                          iCreated ? "Owes you" : "You owe",
+                          style: TextStyle(
+                            color:
+                                iCreated
+                                    ? AppTheme.owedColor
+                                    : AppTheme.owesColor,
                             fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        "₹${iCreated ? total.toStringAsFixed(2) : perPerson.toStringAsFixed(2)}",
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        iCreated ? "Owes you" : "You owe",
-                        style: TextStyle(
-                          color: iCreated
-                              ? AppTheme.owedColor
-                              : AppTheme.owesColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    if (iCreated) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => _confirmDeleteBill(context, docData),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          // child: Icon(
+                          //   Icons.delete_outline_rounded,
+                          //   color: Colors.redAccent,
+                          //   size: 20,
+                          // ),
                         ),
                       ),
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             );
           }),
         );
       },
+    );
+  }
+
+  void _confirmDeleteBill(BuildContext context, Map<String, dynamic> docData) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            title: const Text(
+              "Delete Bill",
+              style: TextStyle(color: Colors.white),
+            ),
+            content: const Text(
+              "This will permanently remove this bill for all members. This action cannot be undone.",
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  final billId = docData['billId'] as String? ?? '';
+                  final billController = Get.put(BillController());
+                  billController.deleteBill(billId);
+                },
+                child: const Text(
+                  "Delete",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
     );
   }
 
@@ -262,16 +314,17 @@ class _DashboardState extends State<Dashboard> {
           );
         }
 
-        final settled = (snapshot.data?.docs ?? []).where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return data['settled'] == true;
-        }).toList()
-          ..sort((a, b) {
-            final at = (a.data() as Map)['createdAt'] as Timestamp?;
-            final bt = (b.data() as Map)['createdAt'] as Timestamp?;
-            if (at == null || bt == null) return 0;
-            return bt.compareTo(at);
-          });
+        final settled =
+            (snapshot.data?.docs ?? []).where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['settled'] == true;
+              }).toList()
+              ..sort((a, b) {
+                final at = (a.data() as Map)['createdAt'] as Timestamp?;
+                final bt = (b.data() as Map)['createdAt'] as Timestamp?;
+                if (at == null || bt == null) return 0;
+                return bt.compareTo(at);
+              });
 
         if (settled.isEmpty) {
           return Container(
@@ -285,92 +338,95 @@ class _DashboardState extends State<Dashboard> {
         }
 
         return Column(
-          children: settled.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final bool iCreated = data['createdBy'] == currentUserId;
-            final double total = (data['totalAmount'] as num).toDouble();
-            final double perPerson = (data['perPersonAmount'] as num).toDouble();
-            final String tripName = data['tripName'] ?? '';
-            final String? groupName = data['groupName'] as String?;
-            final Timestamp? ts = data['createdAt'] as Timestamp?;
-            final String dateStr = ts != null
-                ? "${ts.toDate().day}/${ts.toDate().month}/${ts.toDate().year}"
-                : '';
+          children:
+              settled.map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final bool iCreated = data['createdBy'] == currentUserId;
+                final double total = (data['totalAmount'] as num).toDouble();
+                final double perPerson =
+                    (data['perPersonAmount'] as num).toDouble();
+                final String tripName = data['tripName'] ?? '';
+                final String? groupName = data['groupName'] as String?;
+                final Timestamp? ts = data['createdAt'] as Timestamp?;
+                final String dateStr =
+                    ts != null
+                        ? "${ts.toDate().day}/${ts.toDate().month}/${ts.toDate().year}"
+                        : '';
 
-            return GestureDetector(
-              onTap: () => showBillDetail(context, data),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: AppTheme.listTileDecoration,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.greenAccent.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_circle_rounded,
-                        color: Colors.greenAccent,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tripName,
-                            style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            (groupName != null && groupName.isNotEmpty)
-                                ? "Group: $groupName  •  $dateStr"
-                                : dateStr,
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                return GestureDetector(
+                  onTap: () => showBillDetail(context, data),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: AppTheme.listTileDecoration,
+                    child: Row(
                       children: [
-                        Text(
-                          "₹${(iCreated ? total : perPerson).toStringAsFixed(2)}",
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.greenAccent.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_circle_rounded,
+                            color: Colors.greenAccent,
+                            size: 20,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          "Settled ✓",
-                          style: TextStyle(
-                            color: Colors.greenAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tripName,
+                                style: const TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (groupName != null && groupName.isNotEmpty)
+                                    ? "Group: $groupName  •  $dateStr"
+                                    : dateStr,
+                                style: const TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              "₹${(iCreated ? total : perPerson).toStringAsFixed(2)}",
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              "Settled ✓",
+                              style: TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+                  ),
+                );
+              }).toList(),
         );
       },
     );

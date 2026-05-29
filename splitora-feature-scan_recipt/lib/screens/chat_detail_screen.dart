@@ -35,6 +35,64 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  void _showDeleteOptions(
+    BuildContext context, {
+    required String chatId,
+    required String messageId,
+    required bool isSender,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.white70),
+                title: const Text(
+                  'Delete for Me',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  chatController.deleteMessage(
+                    chatId: chatId,
+                    messageId: messageId,
+                    forEveryone: false,
+                  );
+                },
+              ),
+              if (isSender)
+                ListTile(
+                  leading: const Icon(Icons.delete_forever_rounded,
+                      color: Colors.redAccent),
+                  title: const Text(
+                    'Delete for Everyone',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    chatController.deleteMessage(
+                      chatId: chatId,
+                      messageId: messageId,
+                      forEveryone: true,
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,9 +133,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       reverse: true,
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
+                        final msgDoc = messages[index];
                         var msgData =
-                            messages[index].data() as Map<String, dynamic>;
-                        bool isMe = msgData['senderId'] == currentUserId;
+                            msgDoc.data() as Map<String, dynamic>;
+                        final bool isMe = msgData['senderId'] == currentUserId;
+
+                        // ── "Delete for Me" check ──────────────────────────
+                        final deletedFor =
+                            List<String>.from(msgData['deletedFor'] ?? []);
+                        if (deletedFor.contains(currentUserId)) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final bool deletedForEveryone =
+                            msgData['deletedForEveryone'] == true;
 
                         Timestamp? t = msgData['timestamp'] as Timestamp?;
                         String timeStr =
@@ -85,94 +154,116 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 ? DateFormat('hh:mm a').format(t.toDate())
                                 : '';
 
-                        return Align(
-                          alignment:
-                              isMe
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color:
-                                  isMe
-                                      ? AppTheme.sentMessageBg
-                                      : AppTheme.receivedMessageBg,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(15),
-                                topRight: const Radius.circular(15),
-                                bottomLeft: Radius.circular(isMe ? 15 : 0),
-                                bottomRight: Radius.circular(isMe ? 0 : 15),
+                        final String messageId = msgDoc.id;
+
+                        return GestureDetector(
+                          onLongPress: () => _showDeleteOptions(
+                            context,
+                            chatId: widget.chatId,
+                            messageId: messageId,
+                            isSender: isMe,
+                          ),
+                          child: Align(
+                            alignment:
+                                isMe
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment:
-                                  isMe
-                                      ? CrossAxisAlignment.end
-                                      : CrossAxisAlignment.start,
-                              children: [
-                                if (!isMe && widget.isGroup)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 4.0),
-                                    child: Text(
-                                      msgData['senderName'] ?? 'Unknown',
-                                      style: TextStyle(
-                                        color:
-                                            isMe
-                                                ? AppTheme.sentMessageMeta
-                                                : AppTheme.textSecondary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: deletedForEveryone
+                                    ? Colors.white10
+                                    : isMe
+                                        ? AppTheme.sentMessageBg
+                                        : AppTheme.receivedMessageBg,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(15),
+                                  topRight: const Radius.circular(15),
+                                  bottomLeft: Radius.circular(isMe ? 15 : 0),
+                                  bottomRight: Radius.circular(isMe ? 0 : 15),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment:
+                                    isMe
+                                        ? CrossAxisAlignment.end
+                                        : CrossAxisAlignment.start,
+                                children: [
+                                  if (!isMe && widget.isGroup)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4.0),
+                                      child: Text(
+                                        msgData['senderName'] ?? 'Unknown',
+                                        style: TextStyle(
+                                          color:
+                                              isMe
+                                                  ? AppTheme.sentMessageMeta
+                                                  : AppTheme.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                if (msgData['text'] != null &&
-                                    (msgData['text'] as String).isNotEmpty)
+                                  if (deletedForEveryone)
+                                    const Text(
+                                      'This message was deleted.',
+                                      style: TextStyle(
+                                        color: Colors.white38,
+                                        fontSize: 14,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    )
+                                  else ...[
+                                    if (msgData['text'] != null &&
+                                        (msgData['text'] as String).isNotEmpty)
+                                      Text(
+                                        msgData['text'] ?? '',
+                                        style: TextStyle(
+                                          color:
+                                              isMe
+                                                  ? AppTheme.sentMessageText
+                                                  : AppTheme.receivedMessageText,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    if (msgData['imageUrl'] != null &&
+                                        (msgData['imageUrl'] as String)
+                                            .isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          msgData['imageUrl'],
+                                          width: 200,
+                                          height: 200,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (_, _, _) => const Icon(
+                                                Icons.broken_image,
+                                                color: Colors.white54,
+                                                size: 48,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                  const SizedBox(height: 4),
                                   Text(
-                                    msgData['text'] ?? '',
+                                    timeStr,
                                     style: TextStyle(
                                       color:
                                           isMe
-                                              ? AppTheme.sentMessageText
-                                              : AppTheme.receivedMessageText,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                if (msgData['imageUrl'] != null &&
-                                    (msgData['imageUrl'] as String)
-                                        .isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      msgData['imageUrl'],
-                                      width: 200,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (_, _, _) => const Icon(
-                                            Icons.broken_image,
-                                            color: Colors.white54,
-                                            size: 48,
-                                          ),
+                                              ? AppTheme.sentMessageMeta
+                                              : AppTheme.receivedMessageMeta,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ],
-                                const SizedBox(height: 4),
-                                Text(
-                                  timeStr,
-                                  style: TextStyle(
-                                    color:
-                                        isMe
-                                            ? AppTheme.sentMessageMeta
-                                            : AppTheme.receivedMessageMeta,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                         );
