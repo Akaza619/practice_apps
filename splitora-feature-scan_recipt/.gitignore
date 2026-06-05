@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FCM service account key (bundled into the app, but must NOT be committed)
+assets/service_account.json

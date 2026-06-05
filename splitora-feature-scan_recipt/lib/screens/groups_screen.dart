@@ -66,31 +66,31 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Group Logo Picker
-                        Center(
-                          child: GestureDetector(
-                            onTap: controller.pickImage,
-                            child: Obx(() {
-                              return CircleAvatar(
-                                radius: 40,
-                                backgroundColor: AppTheme.avatarImageBackground,
-                                backgroundImage:
-                                    controller.groupImage.value != null
-                                        ? FileImage(
-                                          controller.groupImage.value!,
-                                        )
-                                        : null,
-                                child:
-                                    controller.groupImage.value == null
-                                        ? const Icon(
-                                          Icons.camera_alt,
-                                          color: AppTheme.textPrimary,
-                                          size: 30,
-                                        )
-                                        : null,
-                              );
-                            }),
-                          ),
-                        ),
+                        // Center(
+                        //   child: GestureDetector(
+                        //     onTap: controller.pickImage,
+                        //     child: Obx(() {
+                        //       return CircleAvatar(
+                        //         radius: 40,
+                        //         backgroundColor: AppTheme.avatarImageBackground,
+                        //         backgroundImage:
+                        //             controller.groupImage.value != null
+                        //                 ? FileImage(
+                        //                   controller.groupImage.value!,
+                        //                 )
+                        //                 : null,
+                        //         child:
+                        //             controller.groupImage.value == null
+                        //                 ? const Icon(
+                        //                   Icons.camera_alt,
+                        //                   color: AppTheme.textPrimary,
+                        //                   size: 30,
+                        //                 )
+                        //                 : null,
+                        //       );
+                        //     }),
+                        //   ),
+                        // ),
                         const SizedBox(height: 20),
 
                         // Title Input
@@ -99,15 +99,15 @@ class _GroupsScreenState extends State<GroupsScreen> {
                           "Group Title",
                           Icons.title,
                         ),
-                        const SizedBox(height: 15),
+                        // const SizedBox(height: 15),
 
                         // Amount Input
-                        _buildTextField(
-                          amountController,
-                          "Total Amount (Optional)",
-                          Icons.attach_money,
-                          keyboard: TextInputType.number,
-                        ),
+                        // _buildTextField(
+                        //   amountController,
+                        //   "Total Amount (Optional)",
+                        //   Icons.attach_money,
+                        //   keyboard: TextInputType.number,
+                        // ),
                         const SizedBox(height: 15),
 
                         // Date Picker
@@ -179,9 +179,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Member List
+                        // Member List (≈5 rows visible, scroll for more)
                         SizedBox(
-                          height: 200,
+                          height: 360,
                           child: Obx(() {
                             if (controller.filteredUsers.isEmpty) {
                               return const Center(
@@ -201,10 +201,13 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   bool isSelected = controller.selectedMemberIds
                                       .contains(user['uid']);
                                   return ListTile(
-                                    onTap: () =>
-                                        controller.toggleSelection(user['uid']),
+                                    onTap:
+                                        () => controller.toggleSelection(
+                                          user['uid'],
+                                        ),
                                     leading: CircleAvatar(
-                                      backgroundColor: AppTheme.avatarBackground,
+                                      backgroundColor:
+                                          AppTheme.avatarBackground,
                                       child: Text(
                                         (user['firstName'] ?? 'U')[0]
                                             .toUpperCase(),
@@ -228,10 +231,10 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                     ),
                                     trailing: Checkbox(
                                       value: isSelected,
-                                      onChanged: (val) =>
-                                          controller.toggleSelection(
-                                        user['uid'],
-                                      ),
+                                      onChanged:
+                                          (val) => controller.toggleSelection(
+                                            user['uid'],
+                                          ),
                                       activeColor: AppTheme.checkboxActive,
                                       checkColor: AppTheme.checkboxCheck,
                                       side: const BorderSide(

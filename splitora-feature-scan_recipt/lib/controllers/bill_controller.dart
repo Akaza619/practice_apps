@@ -36,7 +36,9 @@ class BillController extends GetxController {
               .toList();
       allUsers.value = list;
       filteredUsers.value = list;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('fetchUsers failed: $e');
+    }
   }
 
   void fetchGroups() async {
@@ -49,7 +51,9 @@ class BillController extends GetxController {
               .where('participants', arrayContains: currentUserId)
               .get();
       allGroups.value = snapshot.docs.map((d) => d.data()).toList();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('fetchGroups failed: $e');
+    }
   }
 
   void searchUsers(String query) {
@@ -300,7 +304,6 @@ class BillController extends GetxController {
               .toList();
       final double perPerson = totalAmount / updatedParticipantIds.length;
 
-      final now = DateTime.now();
       final Map<String, dynamic> updates = {
         'totalAmount': totalAmount,
         'perPersonAmount': perPerson,
@@ -394,14 +397,59 @@ class BillController extends GetxController {
     }
   }
 
+  /// Settles the entire bill for everyone. Only the creator can do this.
+  /// Marks every participant as paid (so no member is left "Pending") and
+  /// flips the bill to settled — which moves it to History for all users in
+  /// real time via the bills snapshot stream.
   Future<void> settleBill(String billId) async {
     try {
-      await _firestore.collection('bills').doc(billId).update({
+      final currentUserId = _auth.currentUser!.uid;
+      final billRef = _firestore.collection('bills').doc(billId);
+      final billDoc = await billRef.get();
+
+      if (!billDoc.exists) {
+        _error("Bill not found");
+        return;
+      }
+      final data = billDoc.data() as Map<String, dynamic>;
+
+      if (data['createdBy'] != currentUserId) {
+        _error("Only the bill creator can settle this bill");
+        return;
+      }
+
+      final participants = List<String>.from(data['participants'] ?? []);
+      final tripName = data['tripName'] as String? ?? '';
+      final groupId = data['groupId'] as String?;
+
+      // Mark everyone as paid and settle the bill.
+      await billRef.update({
         'settled': true,
+        'settledBy': participants,
+        'settledAt': FieldValue.serverTimestamp(),
       });
+
+      // Notify all members that the bill is fully settled.
+      final chatController = Get.put(ChatController());
+      final msg =
+          "✅ Bill settled: $tripName\nThe organiser marked this bill as fully settled for everyone.";
+      if (groupId != null && groupId.isNotEmpty) {
+        await chatController.sendMessage(groupId, msg, isGroup: true);
+      } else {
+        for (final uid in participants) {
+          if (uid == currentUserId) continue;
+          final match = allUsers.firstWhereOrNull((u) => u['uid'] == uid);
+          final name = match != null
+              ? (match['displayName'] ?? match['firstName'] ?? 'User')
+              : 'User';
+          final chatId = await chatController.createOrGetChat(uid, name);
+          await chatController.sendMessage(chatId, msg, isGroup: false);
+        }
+      }
+
       Get.snackbar(
         "Done",
-        "Bill marked as settled.",
+        "Bill settled for all members.",
         backgroundColor: Colors.green.shade300,
         colorText: Colors.black87,
       );

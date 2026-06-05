@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
+import 'package:splitora_app/services/push_sender_service.dart';
 
 class ChatController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -70,6 +73,20 @@ class ChatController extends GetxController {
       'lastMessage': text.trim().isEmpty ? (imageUrl != null ? '📷 Receipt image' : '') : text.trim(),
       'lastMessageTime': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    // Push a notification to the other participant(s) so they're alerted even
+    // when their app is closed. Fire-and-forget — never blocks/throws.
+    final notificationBody = text.trim().isNotEmpty
+        ? text.trim()
+        : (imageUrl != null ? '🧾 Sent a receipt' : 'New message');
+    unawaited(
+      PushSenderService.instance.sendChatNotification(
+        chatId: chatId,
+        senderId: currentUserId,
+        senderName: senderName,
+        body: notificationBody,
+      ),
+    );
   }
 
   Stream<QuerySnapshot> getChatsStream() {

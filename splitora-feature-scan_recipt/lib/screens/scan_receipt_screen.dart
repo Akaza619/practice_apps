@@ -771,9 +771,16 @@ class _SplitBillSheetState extends State<_SplitBillSheet> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Row(
                 children: [
-                  Text(
-                    widget.result.merchantName,
-                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  Expanded(
+                    child: Text(
+                      widget.result.merchantName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                   if (widget.result.date.isNotEmpty) ...[
                     const SizedBox(width: 8),

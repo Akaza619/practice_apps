@@ -44,7 +44,10 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
     setState(() => _paying = true);
     final billId = widget.data['billId'] as String? ?? '';
     await _controller.recordPayment(billId);
+    if (!mounted) return;
     setState(() => _paying = false);
+    // Auto-close the bill detail page once payment is recorded.
+    Navigator.of(context).pop();
   }
 
   void _onPaymentError(PaymentFailureResponse response) {

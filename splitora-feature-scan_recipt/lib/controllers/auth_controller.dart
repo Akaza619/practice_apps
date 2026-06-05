@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:splitora_app/screens/main_screen.dart';
 import 'package:splitora_app/screens/login.dart';
+import 'package:splitora_app/services/notification_service.dart';
 
 class AuthController extends GetxController {
   static AuthController instance = Get.find();
@@ -117,6 +118,8 @@ class AuthController extends GetxController {
     if (user == null) {
       Get.offAll(() => const Login());
     } else {
+      // Register this device for push notifications now that we know the user.
+      NotificationService.instance.registerTokenForCurrentUser();
       Get.offAll(() => const MainScreen());
     }
   }
@@ -189,6 +192,8 @@ class AuthController extends GetxController {
   }
 
   void signOut() async {
+    // Drop this device's token first so it stops receiving the user's pushes.
+    await NotificationService.instance.removeTokenForCurrentUser();
     await auth.signOut();
   }
 

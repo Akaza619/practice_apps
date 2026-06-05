@@ -33,23 +33,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _fetchUserData() async {
-    if (user != null) {
-      DocumentSnapshot doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user!.uid)
-              .get();
-      if (doc.exists) {
-        var data = doc.data() as Map<String, dynamic>;
-        firstNameController.text = data['firstName'] ?? '';
-        lastNameController.text = data['lastName'] ?? '';
-        emailController.text = data['email'] ?? '';
-        phoneController.text = data['phone'] ?? '';
+    try {
+      if (user != null) {
+        DocumentSnapshot doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user!.uid)
+                .get();
+        if (doc.exists) {
+          var data = doc.data() as Map<String, dynamic>;
+          firstNameController.text = data['firstName'] ?? '';
+          lastNameController.text = data['lastName'] ?? '';
+          emailController.text = data['email'] ?? '';
+          phoneController.text = data['phone'] ?? '';
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch user data: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
       }
     }
-    setState(() {
-      isLoading = false;
-    });
   }
 
   Future<void> _updateProfile() async {

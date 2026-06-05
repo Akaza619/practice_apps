@@ -211,7 +211,6 @@ class _BillEditScreenState extends State<BillEditScreen> {
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
-    final String currentUid = FirebaseAuth.instance.currentUser!.uid;
 
     bool isGroupBill =
         d['groupId'] != null && (d['groupId'] as String).isNotEmpty;
